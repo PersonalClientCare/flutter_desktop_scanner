@@ -1,0 +1,1 @@
+# flutter_desktop_scanner
