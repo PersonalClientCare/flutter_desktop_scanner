@@ -30,29 +30,15 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
     return version;
   }
 
-  _getScannersIsolate(_IsolateData data) async {
-    BackgroundIsolateBinaryMessenger.ensureInitialized(data.token);
-    final rawScanners = await methodChannel
-        .invokeListMethod<Map<Object?, Object?>>("getScanners");
-    if (rawScanners == null) {
-      data.answerPort.send([]);
-    } else {
-      data.answerPort.send([
-        for (final scanner in rawScanners)
-          Scanner(scanner["name"].toString(), scanner["vendor"].toString(),
-              scanner["model"].toString(), scanner["type"].toString())
-      ]);
-    }
-  }
-
   @override
   Future<List<Scanner>> getScanners() async {
-    final p = ReceivePort();
-    final rootToken = RootIsolateToken.instance!;
-
-    await Isolate.spawn<_IsolateData>(_getScannersIsolate,
-        _IsolateData(token: rootToken, answerPort: p.sendPort));
-
-    return await p.first;
+    final rawScanners = await methodChannel
+        .invokeListMethod<Map<Object?, Object?>>("getScanners");
+    if (rawScanners == null) return [];
+    return [
+      for (final scanner in rawScanners)
+        Scanner(scanner["name"].toString(), scanner["vendor"].toString(),
+            scanner["model"].toString(), scanner["type"].toString())
+    ];
   }
 }

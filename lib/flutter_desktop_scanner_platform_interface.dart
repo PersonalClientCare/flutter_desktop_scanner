@@ -29,7 +29,7 @@ abstract class FlutterDesktopScannerPlatform extends PlatformInterface {
     throw UnimplementedError("platformVersion() has not been implemented.");
   }
 
-  /// Returns a list of scanners found by
+  /// Returns a list of scanners found
   Future<List<Scanner>> getScanners() {
     throw UnimplementedError("getScanners() has not been implemented.");
   }

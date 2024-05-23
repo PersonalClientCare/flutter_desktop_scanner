@@ -4,8 +4,6 @@
 #include <gtk/gtk.h>
 #include <sys/utsname.h>
 #include <sane/sane.h>
-#include <iostream>
-#include <thread>
 
 #include <cstring>
 
@@ -50,14 +48,14 @@ FlMethodResponse* get_platform_version() {
 
 FlMethodResponse* get_scanners() {
   sane_init(nullptr, nullptr);
-  const SANE_Device **device_list;
 
+  const SANE_Device **device_list;
 
   SANE_Status st = sane_get_devices(&device_list, SANE_FALSE);
 
   // get devices
   if (st != SANE_STATUS_GOOD) {
-    return FL_METHOD_RESPONSE(fl_method_error_response_new("E001", "Failed to get device list", nullptr));
+    return FL_METHOD_RESPONSE(fl_method_error_response_new("E001", "Failed to get devices", nullptr));
   }
 
   // Check if any devices are available

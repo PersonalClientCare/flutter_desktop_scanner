@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -19,6 +20,8 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
   final _flutterDesktopScannerPlugin = FlutterDesktopScanner();
+  List<Scanner> _scanners = [];
+  bool _loading = false;
 
   @override
   void initState() {
@@ -61,7 +64,13 @@ class _MyAppState extends State<MyApp> {
             children: [
               Text('Running on: $_platformVersion\n'),
               ElevatedButton(
-                  onPressed: _getScanner, child: const Text("Get scanner"))
+                onPressed: _loading ? null : _setScanner,
+                child: _loading
+                    ? const CircularProgressIndicator.adaptive()
+                    : const Text("Get scanner"),
+              ),
+              ...List.generate(
+                  _scanners.length, (index) => Text(_scanners[index].name)),
             ],
           ),
         ),
@@ -69,8 +78,10 @@ class _MyAppState extends State<MyApp> {
     );
   }
 
-  _getScanner() async {
-    final scanner = await _flutterDesktopScannerPlugin.getScanners();
-    print(scanner[0].name);
+  _setScanner() async {
+    final foundScanners = await _flutterDesktopScannerPlugin.getScanners();
+    setState(() {
+      _scanners = foundScanners;
+    });
   }
 }
