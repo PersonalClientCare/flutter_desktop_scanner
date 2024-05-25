@@ -1,8 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:flutter_desktop_scanner/classes.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_desktop_scanner/flutter_desktop_scanner.dart';
 import 'package:flutter_desktop_scanner/flutter_desktop_scanner_platform_interface.dart';
 import 'package:flutter_desktop_scanner/flutter_desktop_scanner_method_channel.dart';
+import 'package:image/image.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 class MockFlutterDesktopScannerPlatform
@@ -13,6 +16,13 @@ class MockFlutterDesktopScannerPlatform
 
   @override
   Future<List<Scanner>> getScanners() => Future.value([]);
+
+  @override
+  Future<Uint8List> getRawPNMBytes(String scannerName) =>
+      Future.value(Uint8List.fromList([]));
+
+  @override
+  Future<Image> getImageRepr(String scannerName) => Future.value(Image.empty());
 }
 
 void main() {

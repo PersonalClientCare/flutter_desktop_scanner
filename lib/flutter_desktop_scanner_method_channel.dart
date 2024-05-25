@@ -3,6 +3,7 @@ import 'dart:isolate';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_desktop_scanner/classes.dart';
+import 'package:image/image.dart';
 
 import 'flutter_desktop_scanner_platform_interface.dart';
 
@@ -40,5 +41,21 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
         Scanner(scanner["name"].toString(), scanner["vendor"].toString(),
             scanner["model"].toString(), scanner["type"].toString())
     ];
+  }
+
+  @override
+  Future<Uint8List> getRawPNMBytes(String scannerName) async {
+    final bytes = await methodChannel
+        .invokeMethod<Uint8List>("initiateScan", {"scannerName": scannerName});
+    if (bytes == null) return Uint8List(0);
+    return bytes;
+  }
+
+  @override
+  Future<Image?> getImageRepr(String scannerName) async {
+    final bytes = await methodChannel
+        .invokeMethod<Uint8List>("initiateScan", {"scannerName": scannerName});
+    if (bytes == null) return Image.empty();
+    return decodePnm(bytes);
   }
 }

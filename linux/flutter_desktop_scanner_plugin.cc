@@ -4,6 +4,10 @@
 #include <gtk/gtk.h>
 #include <sys/utsname.h>
 #include <sane/sane.h>
+#include <iostream>
+#include <fstream>
+#include <memory>
+#include <stdexcept>
 
 #include <cstring>
 
@@ -26,11 +30,15 @@ static void flutter_desktop_scanner_plugin_handle_method_call(
   g_autoptr(FlMethodResponse) response = nullptr;
 
   const gchar* method = fl_method_call_get_name(method_call);
+  FlValue* args = fl_method_call_get_args(method_call);
 
   if (strcmp(method, "getPlatformVersion") == 0) {
     response = get_platform_version();
   } else if (strcmp(method, "getScanners") == 0) {
     response = get_scanners();
+  } else if (strcmp(method, "initiateScan") == 0) {
+    const char* scanner_name = fl_value_get_string(fl_value_lookup_string(args, "scannerName"));
+    response = initiate_scan(scanner_name);
   } else {
     response = FL_METHOD_RESPONSE(fl_method_not_implemented_response_new());
   }
@@ -47,8 +55,6 @@ FlMethodResponse* get_platform_version() {
 }
 
 FlMethodResponse* get_scanners() {
-  sane_init(nullptr, nullptr);
-
   const SANE_Device **device_list;
 
   SANE_Status st = sane_get_devices(&device_list, SANE_FALSE);
@@ -78,7 +84,106 @@ FlMethodResponse* get_scanners() {
   return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
 }
 
+template<typename ... Args>
+std::string string_format(const std::string& format, Args ... args)
+{
+    int size_s = std::snprintf(nullptr, 0, format.c_str(), args ...) + 1; // Extra space for '\0'
+    if( size_s <= 0 ){ throw std::runtime_error("Error during string formatting"); }
+    auto size = static_cast<size_t>(size_s);
+    std::unique_ptr<char[]> buf(new char[size]);
+    std::snprintf(buf.get(), size, format.c_str(), args ...);
+    return std::string(buf.get(), buf.get() + size - 1); // We don't want the '\0' inside
+}
+
+static std::string write_pnm_header (SANE_Frame sane_format, int width, int height, int depth) {
+  /* The netpbm-package does not define raw image data with maxval > 255. */
+  /* But writing maxval 65535 for 16bit data gives at least a chance */
+  /* to read the image. */
+  switch (sane_format)
+    {
+    case SANE_FRAME_RED:
+    case SANE_FRAME_GREEN:
+    case SANE_FRAME_BLUE:
+    case SANE_FRAME_RGB:
+      return string_format("P6\n# SANE data follows\n%d %d\n%d\n", width, height, (depth <= 8) ? 255 : 65535);
+    default:
+      if (depth == 1)
+        return string_format("P4\n# SANE data follows\n%d %d\n", width, height);
+      else
+        return string_format("P5\n# SANE data follows\n%d %d\n%d\n", width, height, (depth <= 8) ? 255 : 65535);
+    }
+}
+
+FlMethodResponse* initiate_scan(const char* scanner_name) {
+  SANE_Handle handle;
+  if (sane_open(scanner_name, &handle) < 0) {
+    return FL_METHOD_RESPONSE(fl_method_error_response_new("E003", "Unable to open scanner device", nullptr));
+  }
+
+  // find resolution option
+  const SANE_Option_Descriptor* descriptor = sane_get_option_descriptor(handle, 0);
+
+  int nb_opts;
+  SANE_Status st = sane_control_option(handle, 0, SANE_ACTION_GET_VALUE, &nb_opts, nullptr);
+  if (st != SANE_STATUS_GOOD) {
+    sane_close(handle);
+    return FL_METHOD_RESPONSE(fl_method_error_response_new("E004", "Unable to get options count", nullptr));
+  }
+
+  int resolution_indx = 0;
+
+  for (int i = 0; i < nb_opts; i++) {
+    if (strcmp(descriptor[i].name, "resolution")) {
+      resolution_indx = i;
+    }
+  }
+
+  int resolution = 300;
+  if (resolution_indx != 0) {
+    sane_control_option(handle, resolution_indx, SANE_ACTION_SET_VALUE, &resolution, nullptr);
+  }
+
+  SANE_Parameters parameters;
+  if (sane_get_parameters(handle, &parameters) < 0) {
+    sane_close(handle);
+    return FL_METHOD_RESPONSE(fl_method_error_response_new("E005", "Unable to open scanner device", nullptr));
+  }
+
+  if (sane_start(handle) < 0) {
+      sane_close(handle);
+      return FL_METHOD_RESPONSE(fl_method_error_response_new("E006", "Unable to start scan", nullptr));
+  }
+
+  const int max_buffer_size = parameters.bytes_per_line * parameters.lines;
+  uint8_t *image_data = new uint8_t[max_buffer_size];
+  SANE_Word read_bytes;
+
+  if (sane_read(handle, image_data, max_buffer_size, &read_bytes) < 0) {
+    delete[] image_data;
+    sane_cancel(handle);
+    sane_close(handle);
+    return FL_METHOD_RESPONSE(fl_method_error_response_new("E006", "Unable to read scan data", nullptr));
+  };
+
+  sane_close(handle);
+
+  auto header_str = write_pnm_header(parameters.format, parameters.pixels_per_line, parameters.lines, parameters.depth);
+
+  int header_len = header_str.size();
+  int result_size = header_len + max_buffer_size;
+  uint8_t *result_buffer = new uint8_t[result_size];
+
+  memcpy(result_buffer, reinterpret_cast<const uint8_t*>(header_str.c_str()), header_len);
+  memcpy(result_buffer + header_len, image_data, max_buffer_size);
+
+  g_autoptr(FlValue) result = fl_value_new_uint8_list(result_buffer, result_size);
+
+  return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
+}
+
 static void flutter_desktop_scanner_plugin_dispose(GObject* object) {
+  // close sane connection when plugin gets disposed
+  sane_exit();
   G_OBJECT_CLASS(flutter_desktop_scanner_plugin_parent_class)->dispose(object);
 }
 
@@ -86,7 +191,10 @@ static void flutter_desktop_scanner_plugin_class_init(FlutterDesktopScannerPlugi
   G_OBJECT_CLASS(klass)->dispose = flutter_desktop_scanner_plugin_dispose;
 }
 
-static void flutter_desktop_scanner_plugin_init(FlutterDesktopScannerPlugin* self) {}
+static void flutter_desktop_scanner_plugin_init(FlutterDesktopScannerPlugin* self) {
+  // initialize sane when plugin gets registered
+  sane_init(nullptr, nullptr);
+}
 
 static void method_call_cb(FlMethodChannel* channel, FlMethodCall* method_call,
                            gpointer user_data) {

@@ -1,4 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter_desktop_scanner/classes.dart';
+import 'package:image/image.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'flutter_desktop_scanner_method_channel.dart';
@@ -32,5 +35,13 @@ abstract class FlutterDesktopScannerPlatform extends PlatformInterface {
   /// Returns a list of scanners found
   Future<List<Scanner>> getScanners() {
     throw UnimplementedError("getScanners() has not been implemented.");
+  }
+
+  Future<Uint8List> getRawPNMBytes(String scannerName) {
+    throw UnimplementedError("initiateScan() has not been implemented");
+  }
+
+  Future<Image?> getImageRepr(String scannerName) {
+    throw UnimplementedError("getImageRepr() has not been implemented");
   }
 }

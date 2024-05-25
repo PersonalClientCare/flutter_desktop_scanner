@@ -11,3 +11,6 @@ FlMethodResponse *get_platform_version();
 
 // Handles the getScanners method call.
 FlMethodResponse *get_scanners();
+
+// Handles the initiateScan method call.
+FlMethodResponse *initiate_scan(const char* scanner_name);

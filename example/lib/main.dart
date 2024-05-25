@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_desktop_scanner/flutter_desktop_scanner.dart';
+import 'package:image/image.dart' as img;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +22,7 @@ class _MyAppState extends State<MyApp> {
   final _flutterDesktopScannerPlugin = FlutterDesktopScanner();
   List<Scanner> _scanners = [];
   bool _loading = false;
+  Uint8List? _imgBytes = null;
 
   @override
   void initState() {
@@ -70,7 +71,20 @@ class _MyAppState extends State<MyApp> {
                     : const Text("Get scanner"),
               ),
               ...List.generate(
-                  _scanners.length, (index) => Text(_scanners[index].name)),
+                _scanners.length,
+                (index) => MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: () => _initiateScan(_scanners[index].name),
+                    child: Text(_scanners[index].name),
+                  ),
+                ),
+              ),
+              if (_imgBytes != null)
+                Image.memory(
+                  _imgBytes!,
+                  width: 250,
+                )
             ],
           ),
         ),
@@ -82,6 +96,16 @@ class _MyAppState extends State<MyApp> {
     final foundScanners = await _flutterDesktopScannerPlugin.getScanners();
     setState(() {
       _scanners = foundScanners;
+    });
+  }
+
+  _initiateScan(String scannerName) async {
+    img.Image? image =
+        await _flutterDesktopScannerPlugin.getImageRepr(scannerName);
+    setState(() {
+      if (image != null) {
+        _imgBytes = img.encodePng(image);
+      }
     });
   }
 }
