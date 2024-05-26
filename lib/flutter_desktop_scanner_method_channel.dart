@@ -1,21 +1,11 @@
-import 'dart:isolate';
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_desktop_scanner/classes.dart';
-import 'package:image/image.dart';
+import 'package:image/image.dart' as img;
 
 import 'flutter_desktop_scanner_platform_interface.dart';
-
-class _IsolateData {
-  final RootIsolateToken token;
-  final SendPort answerPort;
-
-  _IsolateData({
-    required this.token,
-    required this.answerPort,
-  });
-}
 
 /// An implementation of [FlutterDesktopScannerPlatform] that uses method channels.
 class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
@@ -23,6 +13,14 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
   @visibleForTesting
   final methodChannel =
       const MethodChannel("personalclientcare/flutter_desktop_scanner");
+
+  @visibleForTesting
+  final getDevicesEventChannel = const EventChannel(
+      "personalclientcare/flutter_desktop_scanner_get_devices");
+
+  @visibleForTesting
+  final scanEventChannel =
+      const EventChannel("personalclientcare/flutter_desktop_scanner_scan");
 
   @override
   Future<String?> getPlatformVersion() async {
@@ -32,30 +30,49 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
   }
 
   @override
-  Future<List<Scanner>> getScanners() async {
-    final rawScanners = await methodChannel
-        .invokeListMethod<Map<Object?, Object?>>("getScanners");
-    if (rawScanners == null) return [];
-    return [
-      for (final scanner in rawScanners)
-        Scanner(scanner["name"].toString(), scanner["vendor"].toString(),
-            scanner["model"].toString(), scanner["type"].toString())
-    ];
+  Future<bool> initGetDevices() async {
+    final response = await methodChannel.invokeMethod<bool>("getScanners");
+    if (response == null) return false;
+    return response;
   }
 
   @override
-  Future<Uint8List> getRawPNMBytes(String scannerName) async {
-    final bytes = await methodChannel
-        .invokeMethod<Uint8List>("initiateScan", {"scannerName": scannerName});
-    if (bytes == null) return Uint8List(0);
-    return bytes;
+  Stream<List<Scanner>> getDevicesStream() async* {
+    final stream = getDevicesEventChannel.receiveBroadcastStream();
+    await for (final rawScanners in stream) {
+      yield [
+        for (final scanner in rawScanners ?? [])
+          Scanner(scanner["name"].toString(), scanner["vendor"].toString(),
+              scanner["model"].toString(), scanner["type"].toString())
+      ];
+    }
   }
 
   @override
-  Future<Image?> getImageRepr(String scannerName) async {
-    final bytes = await methodChannel
-        .invokeMethod<Uint8List>("initiateScan", {"scannerName": scannerName});
-    if (bytes == null) return Image.empty();
-    return decodePnm(bytes);
+  Future<bool> initScan(String scannerName) async {
+    final response = await methodChannel
+        .invokeMethod<bool>("initiateScan", {"scannerName": scannerName});
+    if (response == null) return false;
+    return response;
+  }
+
+  @override
+  Stream<Uint8List?> rawPNMStream() async* {
+    final stream = scanEventChannel.receiveBroadcastStream();
+    await for (final bytes in stream) {
+      yield bytes;
+    }
+  }
+
+  @override
+  Stream<img.Image?> imageReprStream() async* {
+    final stream = scanEventChannel.receiveBroadcastStream();
+    await for (final bytes in stream) {
+      if (bytes != null) {
+        yield img.decodePnm(bytes);
+      } else {
+        yield null;
+      }
+    }
   }
 }

@@ -22,6 +22,7 @@ class _MyAppState extends State<MyApp> {
   final _flutterDesktopScannerPlugin = FlutterDesktopScanner();
   List<Scanner> _scanners = [];
   bool _loading = false;
+  bool _imgLoading = false;
   Uint8List? _imgBytes = null;
 
   @override
@@ -67,7 +68,10 @@ class _MyAppState extends State<MyApp> {
               ElevatedButton(
                 onPressed: _loading ? null : _setScanner,
                 child: _loading
-                    ? const CircularProgressIndicator.adaptive()
+                    ? const SizedBox(
+                        width: 24.0,
+                        height: 24.0,
+                        child: CircularProgressIndicator.adaptive())
                     : const Text("Get scanner"),
               ),
               ...List.generate(
@@ -84,7 +88,8 @@ class _MyAppState extends State<MyApp> {
                 Image.memory(
                   _imgBytes!,
                   width: 250,
-                )
+                ),
+              if (_imgLoading) const CircularProgressIndicator.adaptive(),
             ],
           ),
         ),
@@ -93,19 +98,33 @@ class _MyAppState extends State<MyApp> {
   }
 
   _setScanner() async {
-    final foundScanners = await _flutterDesktopScannerPlugin.getScanners();
     setState(() {
-      _scanners = foundScanners;
+      _loading = true;
+      _scanners = [];
     });
+    final scannerStream = _flutterDesktopScannerPlugin.getDevicesStream();
+    scannerStream.listen((scanners) {
+      setState(() {
+        _scanners = scanners;
+        _loading = false;
+      });
+    });
+    await _flutterDesktopScannerPlugin.initGetDevices();
   }
 
   _initiateScan(String scannerName) async {
-    img.Image? image =
-        await _flutterDesktopScannerPlugin.getImageRepr(scannerName);
     setState(() {
-      if (image != null) {
-        _imgBytes = img.encodePng(image);
-      }
+      _imgLoading = true;
     });
+    final stream = _flutterDesktopScannerPlugin.imageReprStream();
+    stream.listen((image) {
+      setState(() {
+        if (image != null) {
+          _imgBytes = img.encodePng(image);
+        }
+        _imgLoading = false;
+      });
+    });
+    await _flutterDesktopScannerPlugin.initScan(scannerName);
   }
 }

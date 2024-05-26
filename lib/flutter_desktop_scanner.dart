@@ -1,5 +1,7 @@
+import 'dart:typed_data';
+
 import 'package:flutter_desktop_scanner/classes.dart';
-import 'package:image/image.dart';
+import 'package:image/image.dart' as img;
 import 'flutter_desktop_scanner_platform_interface.dart';
 
 export 'classes.dart';
@@ -9,15 +11,23 @@ class FlutterDesktopScanner {
     return FlutterDesktopScannerPlatform.instance.getPlatformVersion();
   }
 
-  Future<List<Scanner>> getScanners() {
-    return FlutterDesktopScannerPlatform.instance.getScanners();
+  Future<bool> initGetDevices() {
+    return FlutterDesktopScannerPlatform.instance.initGetDevices();
   }
 
-  Future<List<int>> getRawPNMBytes(String scannerName) {
-    return FlutterDesktopScannerPlatform.instance.getRawPNMBytes(scannerName);
+  Stream<List<Scanner>> getDevicesStream() {
+    return FlutterDesktopScannerPlatform.instance.getDevicesStream();
   }
 
-  Future<Image?> getImageRepr(String scannerName) {
-    return FlutterDesktopScannerPlatform.instance.getImageRepr(scannerName);
+  Future<bool> initScan(String scannerName) {
+    return FlutterDesktopScannerPlatform.instance.initScan(scannerName);
+  }
+
+  Stream<Uint8List?> rawPNMStream() {
+    return FlutterDesktopScannerPlatform.instance.rawPNMStream();
+  }
+
+  Stream<img.Image?> imageReprStream() {
+    return FlutterDesktopScannerPlatform.instance.imageReprStream();
   }
 }

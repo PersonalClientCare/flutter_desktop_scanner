@@ -62,6 +62,10 @@
         "streambuf": "cpp",
         "thread": "cpp",
         "cinttypes": "cpp",
-        "variant": "cpp"
-    }
+        "variant": "cpp",
+        "future": "cpp",
+        "condition_variable": "cpp",
+        "mutex": "cpp"
+    },
+    "cmake.sourceDirectory": "/home/anybill/git_repos/flutter_desktop_scanner/linux"
 }

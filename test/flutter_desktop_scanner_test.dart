@@ -1,6 +1,5 @@
 import 'dart:typed_data';
 
-import 'package:flutter_desktop_scanner/classes.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_desktop_scanner/flutter_desktop_scanner.dart';
 import 'package:flutter_desktop_scanner/flutter_desktop_scanner_platform_interface.dart';
@@ -15,14 +14,34 @@ class MockFlutterDesktopScannerPlatform
   Future<String?> getPlatformVersion() => Future.value('42');
 
   @override
-  Future<List<Scanner>> getScanners() => Future.value([]);
+  Stream<List<Scanner>> getDevicesStream() {
+    // TODO: implement getDevicesStream
+    throw UnimplementedError();
+  }
 
   @override
-  Future<Uint8List> getRawPNMBytes(String scannerName) =>
-      Future.value(Uint8List.fromList([]));
+  Stream<Image?> imageReprStream() {
+    // TODO: implement imageReprStream
+    throw UnimplementedError();
+  }
 
   @override
-  Future<Image> getImageRepr(String scannerName) => Future.value(Image.empty());
+  Future<bool> initGetDevices() {
+    // TODO: implement initGetDevices
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<bool> initScan(String scannerName) {
+    // TODO: implement initScan
+    throw UnimplementedError();
+  }
+
+  @override
+  Stream<Uint8List> rawPNMStream() {
+    // TODO: implement rawPNMStream
+    throw UnimplementedError();
+  }
 }
 
 void main() {

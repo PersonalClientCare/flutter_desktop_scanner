@@ -1,7 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter_desktop_scanner/classes.dart';
-import 'package:image/image.dart';
+import 'package:image/image.dart' as img;
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'flutter_desktop_scanner_method_channel.dart';
@@ -32,16 +32,23 @@ abstract class FlutterDesktopScannerPlatform extends PlatformInterface {
     throw UnimplementedError("platformVersion() has not been implemented.");
   }
 
-  /// Returns a list of scanners found
-  Future<List<Scanner>> getScanners() {
-    throw UnimplementedError("getScanners() has not been implemented.");
+  Future<bool> initGetDevices() {
+    throw UnimplementedError("initGetDevices() has not been implemented.");
   }
 
-  Future<Uint8List> getRawPNMBytes(String scannerName) {
-    throw UnimplementedError("initiateScan() has not been implemented");
+  Stream<List<Scanner>> getDevicesStream() {
+    throw UnimplementedError("getDevicesStream() has not been implemented.");
   }
 
-  Future<Image?> getImageRepr(String scannerName) {
-    throw UnimplementedError("getImageRepr() has not been implemented");
+  Future<bool> initScan(String scannerName) {
+    throw UnimplementedError("initScan() has not been implemented.");
+  }
+
+  Stream<Uint8List?> rawPNMStream() {
+    throw UnimplementedError("rawPNMStream() has not been implemented.");
+  }
+
+  Stream<img.Image?> imageReprStream() {
+    throw UnimplementedError("rawPNMStream() has not been implemented.");
   }
 }

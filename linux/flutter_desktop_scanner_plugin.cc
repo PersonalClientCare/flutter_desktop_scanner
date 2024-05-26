@@ -5,9 +5,8 @@
 #include <sys/utsname.h>
 #include <sane/sane.h>
 #include <iostream>
-#include <fstream>
 #include <memory>
-#include <stdexcept>
+#include <thread>
 
 #include <cstring>
 
@@ -20,6 +19,12 @@
 struct _FlutterDesktopScannerPlugin {
   GObject parent_instance;
 };
+
+static gboolean send_get_devices_events = FALSE;
+static FlEventChannel *get_devices_event_channel = NULL;
+
+static gboolean send_scan_events = FALSE;
+static FlEventChannel *scan_event_channel = NULL;
 
 G_DEFINE_TYPE(FlutterDesktopScannerPlugin, flutter_desktop_scanner_plugin, g_object_get_type())
 
@@ -54,23 +59,36 @@ FlMethodResponse* get_platform_version() {
   return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
 }
 
-FlMethodResponse* get_scanners() {
+void get_scanners_thread() {
   const SANE_Device **device_list;
 
   SANE_Status st = sane_get_devices(&device_list, SANE_FALSE);
 
   // get devices
   if (st != SANE_STATUS_GOOD) {
-    return FL_METHOD_RESPONSE(fl_method_error_response_new("E001", "Failed to get devices", nullptr));
+    if (send_get_devices_events) {
+      g_autoptr(GError) error = NULL;
+      if (!fl_event_channel_send(get_devices_event_channel, fl_value_new_null(), NULL, &error)) {
+        g_warning("Failed to send event: %s", error->message);
+      }
+    }
+    return;
   }
 
   // Check if any devices are available
   if (device_list == nullptr) {
-    return FL_METHOD_RESPONSE(fl_method_error_response_new("E002", "No scanner devices found", nullptr));
+    if (send_get_devices_events) {
+      g_autoptr(GError) error = NULL;
+      if (!fl_event_channel_send(get_devices_event_channel, fl_value_new_null(), NULL, &error)) {
+        g_warning("Failed to send event: %s", error->message);
+      }
+    }
+    return;
   }
 
   g_autoptr(FlValue) result = fl_value_new_list();
 
+  // compile a device list
   for (int i = 0; device_list[i] != nullptr; i++) {
     const SANE_Device *dev = device_list[i];
     g_autoptr(FlValue) entry = fl_value_new_map();
@@ -80,6 +98,24 @@ FlMethodResponse* get_scanners() {
     fl_value_set(entry, fl_value_new_string("type"), fl_value_new_string(dev->type));
     fl_value_append(result, entry);
   }
+
+  if (send_get_devices_events) {
+    g_autoptr(GError) error = NULL;
+    // According to flutter this is unsafe and event channel messages should be sent in the main thread. 
+    // But we need to thread here so sane_get_devices does not block the UI thread.
+    // @liquidiert maybe investigate a better approach
+    if (!fl_event_channel_send(get_devices_event_channel, result, NULL, &error)) {
+      g_warning("Failed to send event: %s", error->message);
+    }
+  }
+}
+
+FlMethodResponse* get_scanners() {
+  
+  std::thread get_devices_thread(get_scanners_thread);
+  get_devices_thread.detach();
+
+  g_autoptr(FlValue) result = fl_value_new_bool(TRUE);
 
   return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
 }
@@ -114,11 +150,7 @@ static std::string write_pnm_header (SANE_Frame sane_format, int width, int heig
     }
 }
 
-FlMethodResponse* initiate_scan(const char* scanner_name) {
-  SANE_Handle handle;
-  if (sane_open(scanner_name, &handle) < 0) {
-    return FL_METHOD_RESPONSE(fl_method_error_response_new("E003", "Unable to open scanner device", nullptr));
-  }
+void initiate_scan_thread(SANE_Handle handle) {
 
   // find resolution option
   const SANE_Option_Descriptor* descriptor = sane_get_option_descriptor(handle, 0);
@@ -127,7 +159,13 @@ FlMethodResponse* initiate_scan(const char* scanner_name) {
   SANE_Status st = sane_control_option(handle, 0, SANE_ACTION_GET_VALUE, &nb_opts, nullptr);
   if (st != SANE_STATUS_GOOD) {
     sane_close(handle);
-    return FL_METHOD_RESPONSE(fl_method_error_response_new("E004", "Unable to get options count", nullptr));
+    if (send_scan_events) {
+      g_autoptr(GError) error = NULL;
+      if (!fl_event_channel_send(scan_event_channel, fl_value_new_null(), NULL, &error)) {
+        g_warning("Failed to send event: %s", error->message);
+      }
+    }
+    return;
   }
 
   int resolution_indx = 0;
@@ -146,12 +184,24 @@ FlMethodResponse* initiate_scan(const char* scanner_name) {
   SANE_Parameters parameters;
   if (sane_get_parameters(handle, &parameters) < 0) {
     sane_close(handle);
-    return FL_METHOD_RESPONSE(fl_method_error_response_new("E005", "Unable to open scanner device", nullptr));
+    if (send_scan_events) {
+      g_autoptr(GError) error = NULL;
+      if (!fl_event_channel_send(scan_event_channel, fl_value_new_null(), NULL, &error)) {
+        g_warning("Failed to send event: %s", error->message);
+      }
+    }
+    return;
   }
 
   if (sane_start(handle) < 0) {
       sane_close(handle);
-      return FL_METHOD_RESPONSE(fl_method_error_response_new("E006", "Unable to start scan", nullptr));
+      if (send_scan_events) {
+      g_autoptr(GError) error = NULL;
+      if (!fl_event_channel_send(scan_event_channel, fl_value_new_null(), NULL, &error)) {
+        g_warning("Failed to send event: %s", error->message);
+      }
+    }
+    return;
   }
 
   const int max_buffer_size = parameters.bytes_per_line * parameters.lines;
@@ -162,7 +212,13 @@ FlMethodResponse* initiate_scan(const char* scanner_name) {
     delete[] image_data;
     sane_cancel(handle);
     sane_close(handle);
-    return FL_METHOD_RESPONSE(fl_method_error_response_new("E006", "Unable to read scan data", nullptr));
+    if (send_scan_events) {
+      g_autoptr(GError) error = NULL;
+      if (!fl_event_channel_send(scan_event_channel, fl_value_new_null(), NULL, &error)) {
+        g_warning("Failed to send event: %s", error->message);
+      }
+    }
+    return;
   };
 
   sane_close(handle);
@@ -177,6 +233,28 @@ FlMethodResponse* initiate_scan(const char* scanner_name) {
   memcpy(result_buffer + header_len, image_data, max_buffer_size);
 
   g_autoptr(FlValue) result = fl_value_new_uint8_list(result_buffer, result_size);
+
+  if (send_scan_events) {
+    g_autoptr(GError) error = NULL;
+    if (!fl_event_channel_send(scan_event_channel, result, NULL, &error)) {
+      g_warning("Failed to send event: %s", error->message);
+    }
+  }
+}
+
+FlMethodResponse* initiate_scan(const char* scanner_name) {
+  SANE_Handle handle;
+  // sane open has to be called on main thread, don't ask me why
+  SANE_Status st = sane_open(scanner_name, &handle);
+
+  if (st != SANE_STATUS_GOOD) {
+    return FL_METHOD_RESPONSE(fl_method_error_response_new("E001", "Failed to open device", nullptr));
+  }
+
+  std::thread scan_thread(initiate_scan_thread, handle);
+  scan_thread.detach();
+
+  g_autoptr(FlValue) result = fl_value_new_bool(TRUE);
 
   return FL_METHOD_RESPONSE(fl_method_success_response_new(result));
 }
@@ -202,6 +280,36 @@ static void method_call_cb(FlMethodChannel* channel, FlMethodCall* method_call,
   flutter_desktop_scanner_plugin_handle_method_call(plugin, method_call);
 }
 
+static FlMethodErrorResponse* on_listen_get_devices_callback(FlEventChannel* channel,
+                                         FlValue *args,
+                                         gpointer user_data) {
+  send_get_devices_events = TRUE;
+  return NULL;
+}
+
+// TODO: find a way to use this
+/* static FlMethodErrorResponse* on_cancel_get_devices_callback(GObject *object,
+                                         FlValue *args,
+                                         gpointer user_data) {
+  send_get_devices_events = FALSE;
+  return NULL;
+} */
+
+static FlMethodErrorResponse* on_listen_scan_callback(FlEventChannel* channel,
+                                         FlValue *args,
+                                         gpointer user_data) {
+  send_scan_events = TRUE;
+  return NULL;
+}
+
+// TODO: find a way to use this
+/* static FlMethodErrorResponse* on_cancel_scan_callback(GObject *object,
+                                         FlValue *args,
+                                         gpointer user_data) {
+  send_scan_events = FALSE;
+  return NULL;
+} */
+
 void flutter_desktop_scanner_plugin_register_with_registrar(FlPluginRegistrar* registrar) {
   FlutterDesktopScannerPlugin* plugin = FLUTTER_DESKTOP_SCANNER_PLUGIN(
       g_object_new(flutter_desktop_scanner_plugin_get_type(), nullptr));
@@ -214,6 +322,26 @@ void flutter_desktop_scanner_plugin_register_with_registrar(FlPluginRegistrar* r
   fl_method_channel_set_method_call_handler(channel, method_call_cb,
                                             g_object_ref(plugin),
                                             g_object_unref);
+
+  get_devices_event_channel =
+      fl_event_channel_new(
+                        fl_plugin_registrar_get_messenger(registrar),
+                        "personalclientcare/flutter_desktop_scanner_get_devices",
+                        FL_METHOD_CODEC(codec)
+                      );
+
+  fl_event_channel_set_stream_handlers(get_devices_event_channel, on_listen_get_devices_callback, nullptr,
+                                         g_object_ref(plugin), g_object_unref);
+
+  scan_event_channel =
+      fl_event_channel_new(
+                        fl_plugin_registrar_get_messenger(registrar),
+                        "personalclientcare/flutter_desktop_scanner_scan",
+                        FL_METHOD_CODEC(codec)
+                      );
+
+  fl_event_channel_set_stream_handlers(scan_event_channel, on_listen_scan_callback, nullptr,
+                                         g_object_ref(plugin), g_object_unref);
 
   g_object_unref(plugin);
 }
