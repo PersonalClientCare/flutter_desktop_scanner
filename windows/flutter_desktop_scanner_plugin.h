@@ -23,6 +23,8 @@ class FlutterDesktopScannerPlugin : public flutter::Plugin {
 
   static DWORD WINAPI HandleGetDevices(LPVOID);
 
+  static DWORD WINAPI HandleScan(LPVOID);
+
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(
       const flutter::MethodCall<flutter::EncodableValue> &method_call,
@@ -35,7 +37,8 @@ class FlutterDesktopScannerPlugin : public flutter::Plugin {
     static void OnScanStreamListen(std::unique_ptr<flutter::EventSink<>>&& events);
     static void OnScanStreamCancel();
 
-    static std::unique_ptr<flutter::EventSink<>> _event_sink;
+    static std::unique_ptr<flutter::EventSink<>> _devices_event_sink;
+    static std::unique_ptr<flutter::EventSink<>> _scan_event_sink;
 };
 
 }  // namespace flutter_desktop_scanner

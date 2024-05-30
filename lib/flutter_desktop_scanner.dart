@@ -19,8 +19,8 @@ class FlutterDesktopScanner {
     return FlutterDesktopScannerPlatform.instance.getDevicesStream();
   }
 
-  Future<bool> initScan(String scannerName) {
-    return FlutterDesktopScannerPlatform.instance.initScan(scannerName);
+  Future<bool> initScan(Scanner scanner) {
+    return FlutterDesktopScannerPlatform.instance.initScan(scanner);
   }
 
   Stream<Uint8List?> rawPNMStream() {

@@ -40,7 +40,7 @@ abstract class FlutterDesktopScannerPlatform extends PlatformInterface {
     throw UnimplementedError("getDevicesStream() has not been implemented.");
   }
 
-  Future<bool> initScan(String scannerName) {
+  Future<bool> initScan(Scanner scanner) {
     throw UnimplementedError("initScan() has not been implemented.");
   }
 

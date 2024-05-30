@@ -25,7 +25,8 @@
 namespace flutter_desktop_scanner {
 
 // static
-std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> FlutterDesktopScannerPlugin::_event_sink = nullptr;
+std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> FlutterDesktopScannerPlugin::_devices_event_sink = nullptr;
+std::unique_ptr<flutter::EventSink<flutter::EncodableValue>> FlutterDesktopScannerPlugin::_scan_event_sink = nullptr;
 
 void FlutterDesktopScannerPlugin::RegisterWithRegistrar(
     flutter::PluginRegistrarWindows *registrar) {  
@@ -78,20 +79,21 @@ FlutterDesktopScannerPlugin::FlutterDesktopScannerPlugin() {}
 
 FlutterDesktopScannerPlugin::~FlutterDesktopScannerPlugin() {}
 
-
 DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
     HRESULT hr;
     IWiaDevMgr2 *dev_manager;
     hr = CoCreateInstance(CLSID_WiaDevMgr2, NULL, CLSCTX_LOCAL_SERVER, IID_IWiaDevMgr2, (void**)&dev_manager);
     if (FAILED(hr)) {
-        _event_sink->Error("WIA_ERROR", "Failed to create WIA device manager");
+        CoUninitialize();
+        _devices_event_sink->Error("WIA_ERROR", "Failed to create WIA device manager");
         return 1;
     }
 
     IEnumWIA_DEV_INFO *dev_info_enum;
     hr = dev_manager->EnumDeviceInfo(WIA_DEVINFO_ENUM_LOCAL, &dev_info_enum);
     if (FAILED(hr)) {
-        _event_sink->Error("WIA_ERROR", "Failed to enumerate WIA devices");
+        CoUninitialize();
+        _devices_event_sink->Error("WIA_ERROR", "Failed to enumerate WIA devices");
         return 1;
     }
 
@@ -106,7 +108,8 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
             break;
         }
         if (FAILED(hr)) {
-            _event_sink->Error("WIA_ERROR", "Failed to get WIA device info");
+            CoUninitialize();
+            _devices_event_sink->Error("WIA_ERROR", "Failed to get WIA device info");
             return 1;
         }
 
@@ -118,7 +121,8 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
         PROPVARIANT dev_name;
         hr = dev_info->ReadMultiple(1, &dev_name_spec, &dev_name);
         if (FAILED(hr)) {
-            _event_sink->Error("WIA_ERROR", "Failed to get WIA device name");
+            CoUninitialize();
+            _devices_event_sink->Error("WIA_ERROR", "Failed to get WIA device name");
             return 1;
         }
 
@@ -137,7 +141,8 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
         PROPVARIANT dev_model;
         hr = dev_info->ReadMultiple(1, &psDeviceID, &dev_model);
         if (FAILED(hr)) {
-            _event_sink->Error("WIA_ERROR", "Failed to get WIA model");
+            CoUninitialize();
+            _devices_event_sink->Error("WIA_ERROR", "Failed to get WIA model");
             return 1;
         }
 
@@ -156,7 +161,8 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
         PROPVARIANT dev_vendor;
         hr = dev_info->ReadMultiple(1, &psDeviceVendor, &dev_vendor);
         if (FAILED(hr)) {
-            _event_sink->Error("WIA_ERROR", "Failed to get WIA vendor");
+            CoUninitialize();
+            _devices_event_sink->Error("WIA_ERROR", "Failed to get WIA vendor");
             return 1;
         }
 
@@ -167,36 +173,17 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
             return (char)c;
         });
 
-        // get device type
-        PROPSPEC psDeviceType;
-        psDeviceType.ulKind = PRSPEC_PROPID;
-        psDeviceType.propid = WIA_DIP_DEV_TYPE;
-
-        PROPVARIANT dev_type;
-        hr = dev_info->ReadMultiple(1, &psDeviceType, &dev_type);
-        if (FAILED(hr)) {
-            _event_sink->Error("WIA_ERROR", "Failed to get WIA type");
-            return 1;
-        }
-
-        auto wide_type = std::wstring(dev_type.bstrVal);
-
-        std::string type(wide_type.length(), 0);
-        std::transform(wide_type.begin(), wide_type.end(), type.begin(), [] (wchar_t c) {
-            return (char)c;
-        });
-
         flutter::EncodableMap device = {
           {"name", name},
           {"model", model},
           {"vendor", vendor},
-          {"type", type}
+          {"type", "Windows Scanner Device"} // TODO: find a way to get real scanner type WIA_DIP_DEV_TYPE
         };
 
         devices.push_back(device);
     }
 
-    _event_sink->Success(devices);
+    _devices_event_sink->Success(devices);
 
     dev_info_enum->Release();
     dev_manager->Release();
@@ -204,22 +191,28 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
     return 0;
 }
 
-void FlutterDesktopScannerPlugin::OnGetDevicesStreamListen(std::unique_ptr<flutter::EventSink<>>&& events) {
-  _event_sink = std::move(events);
+DWORD WINAPI FlutterDesktopScannerPlugin::HandleScan(LPVOID lpParam) {
+
 }
 
-void FlutterDesktopScannerPlugin::OnGetDevicesStreamCancel() { _event_sink = nullptr; }
+void FlutterDesktopScannerPlugin::OnGetDevicesStreamListen(std::unique_ptr<flutter::EventSink<>>&& events) {
+  _devices_event_sink = std::move(events);
+}
+
+void FlutterDesktopScannerPlugin::OnGetDevicesStreamCancel() { _devices_event_sink = nullptr; }
 
 void FlutterDesktopScannerPlugin::OnScanStreamListen(std::unique_ptr<flutter::EventSink<>>&& events) {
-  _event_sink = std::move(events);
+  _scan_event_sink = std::move(events);
 }
 
-void FlutterDesktopScannerPlugin::OnScanStreamCancel() { _event_sink = nullptr; }
+void FlutterDesktopScannerPlugin::OnScanStreamCancel() { _scan_event_sink = nullptr; }
 
 
 void FlutterDesktopScannerPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
+
+  auto args = method_call.arguments();
   if (method_call.method_name().compare("getPlatformVersion") == 0) {
     std::ostringstream version_stream;
     version_stream << "Windows ";
@@ -233,6 +226,9 @@ void FlutterDesktopScannerPlugin::HandleMethodCall(
     result->Success(flutter::EncodableValue(version_stream.str()));
    } else if (method_call.method_name().compare("getScanners") == 0) {
     CreateThread(NULL, 0, HandleGetDevices, NULL, 0, NULL);
+    result->Success(flutter::EncodableValue(true));
+   } else if (method_call.method_name().compare("initiateScan") == 0) {
+    CreateThread(NULL, 0, HandleScan, args, 0, NULL);
     result->Success(flutter::EncodableValue(true));
    } else {
     result->NotImplemented();

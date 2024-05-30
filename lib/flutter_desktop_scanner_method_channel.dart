@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -49,9 +50,13 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
   }
 
   @override
-  Future<bool> initScan(String scannerName) async {
+  Future<bool> initScan(Scanner scanner) async {
+    var identifier = scanner.name;
+    if (Platform.isWindows) {
+      identifier = scanner.model;
+    }
     final response = await methodChannel
-        .invokeMethod<bool>("initiateScan", {"scannerName": scannerName});
+        .invokeMethod<bool>("initiateScan", {"scannerName": identifier});
     if (response == null) return false;
     return response;
   }

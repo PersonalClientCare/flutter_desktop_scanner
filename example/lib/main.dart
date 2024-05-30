@@ -79,7 +79,7 @@ class _MyAppState extends State<MyApp> {
                 (index) => MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
-                    onTap: () => _initiateScan(_scanners[index].name),
+                    onTap: () => _initiateScan(_scanners[index]),
                     child: Text(_scanners[index].name),
                   ),
                 ),
@@ -112,7 +112,7 @@ class _MyAppState extends State<MyApp> {
     await _flutterDesktopScannerPlugin.initGetDevices();
   }
 
-  _initiateScan(String scannerName) async {
+  _initiateScan(Scanner scanner) async {
     setState(() {
       _imgLoading = true;
     });
@@ -125,6 +125,6 @@ class _MyAppState extends State<MyApp> {
         _imgLoading = false;
       });
     });
-    await _flutterDesktopScannerPlugin.initScan(scannerName);
+    await _flutterDesktopScannerPlugin.initScan(scanner);
   }
 }
