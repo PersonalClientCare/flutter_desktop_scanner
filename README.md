@@ -35,7 +35,7 @@ Nothing to do here! WIA is generally available as a header file.
 ### MacOS
 
 ## Using the plugin
-Because the scanning process for devices, as well as the literal scanning, takes some time the plugin is based on `EventChannels`. `EventChannels` are like `MethodChannels` but for streams, which allow for getting data from native platforms via a stream. Because of that you always have to get a stream refrence before initiating an action.
+Because the scanning process for devices, as well as the literal scanning, takes some time the plugin is based on `EventChannels`. `EventChannels` are like `MethodChannels` but for streams, which allow for getting data from native platforms via a stream. Because of that you always have to get a stream reference before initiating an action.
 
 Here's how to get devices:
 
