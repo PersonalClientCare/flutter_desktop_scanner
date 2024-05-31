@@ -44,8 +44,8 @@ abstract class FlutterDesktopScannerPlatform extends PlatformInterface {
     throw UnimplementedError("initScan() has not been implemented.");
   }
 
-  Stream<Uint8List?> rawPNMStream() {
-    throw UnimplementedError("rawPNMStream() has not been implemented.");
+  Stream<Uint8List?> rawBytesStream() {
+    throw UnimplementedError("rawBytesStream() has not been implemented.");
   }
 
   Stream<img.Image?> imageReprStream() {

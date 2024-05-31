@@ -62,7 +62,7 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
   }
 
   @override
-  Stream<Uint8List?> rawPNMStream() async* {
+  Stream<Uint8List?> rawBytesStream() async* {
     final stream = scanEventChannel.receiveBroadcastStream();
     await for (final bytes in stream) {
       yield bytes;
