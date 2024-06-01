@@ -62,7 +62,7 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
   }
 
   @override
-  Stream<Uint8List?> rawPNMStream() async* {
+  Stream<Uint8List?> rawBytesStream() async* {
     final stream = scanEventChannel.receiveBroadcastStream();
     await for (final bytes in stream) {
       yield bytes;
@@ -74,7 +74,16 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
     final stream = scanEventChannel.receiveBroadcastStream();
     await for (final bytes in stream) {
       if (bytes != null) {
-        yield img.decodePnm(bytes);
+        if (Platform.isWindows) {
+          var decodedImg = img.decodeJpg(bytes);
+          // try out some other formats before returning null eventually
+          decodedImg ??= img.decodePng(bytes);
+          decodedImg ??= img.decodeBmp(bytes);
+          decodedImg ??= img.decodeTiff(bytes);
+          yield decodedImg;
+        } else if (Platform.isLinux) {
+          yield img.decodePnm(bytes);
+        }
       } else {
         yield null;
       }

@@ -23,8 +23,8 @@ class FlutterDesktopScanner {
     return FlutterDesktopScannerPlatform.instance.initScan(scanner);
   }
 
-  Stream<Uint8List?> rawPNMStream() {
-    return FlutterDesktopScannerPlatform.instance.rawPNMStream();
+  Stream<Uint8List?> rawBytesStream() {
+    return FlutterDesktopScannerPlatform.instance.rawBytesStream();
   }
 
   Stream<img.Image?> imageReprStream() {

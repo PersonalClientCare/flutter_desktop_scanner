@@ -32,13 +32,13 @@ class MockFlutterDesktopScannerPlatform
   }
 
   @override
-  Future<bool> initScan(String scannerName) {
+  Future<bool> initScan(Scanner scanner) {
     // TODO: implement initScan
     throw UnimplementedError();
   }
 
   @override
-  Stream<Uint8List> rawPNMStream() {
+  Stream<Uint8List> rawBytesStream() {
     // TODO: implement rawPNMStream
     throw UnimplementedError();
   }
