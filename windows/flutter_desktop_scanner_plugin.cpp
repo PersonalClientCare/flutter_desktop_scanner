@@ -18,6 +18,7 @@
 #include <sstream>
 #include <algorithm>
 #include <vector>
+#include <thread>
 
 #include <wia.h>
 #include <comdef.h>
@@ -260,11 +261,11 @@ FlutterDesktopScannerPlugin::FlutterDesktopScannerPlugin() {}
 
 FlutterDesktopScannerPlugin::~FlutterDesktopScannerPlugin() {}
 
-DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
+void FlutterDesktopScannerPlugin::HandleGetDevices() {
   HRESULT hr = CoInitialize(nullptr);
   if (FAILED(hr)) {
     _devices_event_sink->Error("WIA_ERROR", "Failed to initialize COM interface");
-    return 1;
+    return;
   }
 
   IWiaDevMgr2 *dev_manager;
@@ -272,7 +273,7 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
   if (FAILED(hr)) {
       CoUninitialize();
       _devices_event_sink->Error("WIA_ERROR", "Failed to create WIA device manager");
-      return 1;
+      return;
   }
 
   IEnumWIA_DEV_INFO *dev_info_enum;
@@ -280,7 +281,7 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
   if (FAILED(hr)) {
       CoUninitialize();
       _devices_event_sink->Error("WIA_ERROR", "Failed to enumerate WIA devices");
-      return 1;
+      return;
   }
 
   IWiaPropertyStorage *dev_info;
@@ -296,7 +297,7 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
     if (FAILED(hr)) {
       CoUninitialize();
       _devices_event_sink->Error("WIA_ERROR", "Failed to get WIA device info");
-      return 1;
+      return;
     }
 
     // get device name
@@ -309,7 +310,7 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
     if (FAILED(hr)) {
       CoUninitialize();
       _devices_event_sink->Error("WIA_ERROR", "Failed to get WIA device name");
-      return 1;
+      return;
     }
 
     auto wide_name = std::wstring(dev_name.bstrVal);
@@ -329,7 +330,7 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
     if (FAILED(hr)) {
       CoUninitialize();
       _devices_event_sink->Error("WIA_ERROR", "Failed to get WIA model");
-      return 1;
+      return;
     }
 
     auto wide_model = std::wstring(dev_model.bstrVal);
@@ -349,7 +350,7 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
     if (FAILED(hr)) {
       CoUninitialize();
       _devices_event_sink->Error("WIA_ERROR", "Failed to get WIA vendor");
-      return 1;
+      return;
     }
 
     auto wide_vendor = std::wstring(dev_vendor.bstrVal);
@@ -373,43 +374,27 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleGetDevices(LPVOID lpParam) {
 
   dev_info_enum->Release();
   dev_manager->Release();
-
-  return 0;
 }
 
-DWORD WINAPI FlutterDesktopScannerPlugin::HandleScan(LPVOID lpParam) {
+std::wstring ConvertAnsiToWide(const std::string& str)
+{
+    int count = MultiByteToWideChar(CP_ACP, 0, str.c_str(), static_cast<int>(str.length()), NULL, 0);
+    std::wstring wstr(count, 0);
+    MultiByteToWideChar(CP_ACP, 0, str.c_str(), static_cast<int>(str.length()), &wstr[0], count);
+    return wstr;
+}
+
+void FlutterDesktopScannerPlugin::HandleScan(std::string deviceId) {
   std::vector<BYTE> scannedData;
 
-  std::cout << "Starting scan" << std::endl;
-
-  flutter::EncodableMap **rawArgsPointer = static_cast<flutter::EncodableMap**>(lpParam);
-  flutter::EncodableMap *rawArgs = static_cast<flutter::EncodableMap*>(*rawArgsPointer);
-  std::cout << "got raw args " << rawArgs << std::endl;
-
-  auto map_entry = rawArgs->find(flutter::EncodableValue("scannerName"))->second;
-
-  std::cout << "got map entry" << std::endl;
-
-
-  std::string *deviceId = std::get_if<std::string>(&(map_entry));
-
-  std::cout << "casted dev id" << std::endl;
-
-
-  std::wstring wide_id(deviceId->begin(), deviceId->end());
-
-  std::cout << "Parsed args" << std::endl;
-
+  std::wstring wide_id = ConvertAnsiToWide(deviceId);
 
   // Initialize COM library
   HRESULT hr = CoInitialize(nullptr);
   if (FAILED(hr)) {
     _devices_event_sink->Error("WIA_ERROR", "Failed to initialize COM interface");
-    return 1;
+    return;
   }
-
-  std::cout << "inited com lib" << std::endl;
-
 
   // Create WIA device manager
   IWiaDevMgr2 *pWiaDevMgr;
@@ -417,11 +402,8 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleScan(LPVOID lpParam) {
   if (FAILED(hr)) {
     CoUninitialize();
     _devices_event_sink->Error("WIA_ERROR", "Failed to create WIA device manager");
-    return 1;
+    return;
   }
-
-  std::cout << "created dev manager" << std::endl;
-
 
   // Create WIA device using the device ID
   IWiaItem2 *pWiaRootItem;
@@ -429,11 +411,8 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleScan(LPVOID lpParam) {
   if (FAILED(hr)) {
     CoUninitialize();
     _devices_event_sink->Error("WIA_ERROR", "Failed to create device");
-    return 1;
+    return;
   }
-
-  std::cout << "got root item" << std::endl;
-
 
   // Enumerate child items to find the scanner items
   IEnumWiaItem2 *pEnumItem;
@@ -441,11 +420,8 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleScan(LPVOID lpParam) {
   if (FAILED(hr)) {
     CoUninitialize();
     _devices_event_sink->Error("WIA_ERROR", "Failed to enumerate items");
-    return 1;
+    return;
   }
-
-  std::cout << "enumerated child items" << std::endl;
-
 
   // Find the scanner item
   IWiaItem2 *pWiaScanItem;
@@ -464,11 +440,8 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleScan(LPVOID lpParam) {
   if (!pWiaScanItem) {
     CoUninitialize();
     _devices_event_sink->Error("WIA_ERROR", "Failed to find scan item");
-    return 1;
+    return;
   }
-
-  std::cout << "got scan item" << std::endl;
-
 
   // Create a memory stream to receive the scanned data
   IStream *pMemoryStream = new MemoryStream();
@@ -477,39 +450,27 @@ DWORD WINAPI FlutterDesktopScannerPlugin::HandleScan(LPVOID lpParam) {
   IWiaTransfer *pWiaTransfer;
   hr = pWiaScanItem->QueryInterface(IID_IWiaTransfer, (void**)&pWiaTransfer);
   if (FAILED(hr)) {
-      CoUninitialize();
-      _devices_event_sink->Error("WIA_ERROR", "Failed to initiate wia transfer");
-      return 1;
+    CoUninitialize();
+    _devices_event_sink->Error("WIA_ERROR", "Failed to initiate wia transfer");
+    return;
   }
-  std::cout << "initatied scan" << std::endl;
 
   WiaTransferCallback* pWiaTransferCallback = new WiaTransferCallback(pMemoryStream);
   hr = pWiaTransfer->Download(0, pWiaTransferCallback);
   if (FAILED(hr)) {
-      CoUninitialize();
-      _devices_event_sink->Error("WIA_ERROR", "Failed to download transfer data");
-      return 1;
+    CoUninitialize();
+    _devices_event_sink->Error("WIA_ERROR", "Failed to download transfer data");
+    return;
   }
-
-  std::cout << "got transfer callback" << std::endl;
-
   
   MemoryStream* pMemStream = static_cast<MemoryStream*>(pMemoryStream);
   scannedData = pMemStream->GetData();
-
-  std::cout << "got data" << std::endl;
-
 
   _scan_event_sink->Success(flutter::EncodableValue(scannedData));
 
   // Clean up
   pWiaTransferCallback->Release();
   CoUninitialize();
-
-  std::cout << "groote success" << std::endl;
-
-
-  return 0;
 }
 
 void FlutterDesktopScannerPlugin::OnGetDevicesStreamListen(std::unique_ptr<flutter::EventSink<>>&& events) {
@@ -529,7 +490,8 @@ void FlutterDesktopScannerPlugin::HandleMethodCall(
     const flutter::MethodCall<flutter::EncodableValue> &method_call,
     std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>> result) {
 
-  const flutter::EncodableValue *args = method_call.arguments();
+  const auto *args = std::get_if<flutter::EncodableMap>(method_call.arguments());
+
   if (method_call.method_name().compare("getPlatformVersion") == 0) {
     std::ostringstream version_stream;
     version_stream << "Windows ";
@@ -543,11 +505,14 @@ void FlutterDesktopScannerPlugin::HandleMethodCall(
     result->Success(flutter::EncodableValue(version_stream.str()));
    } else if (method_call.method_name().compare("getScanners") == 0) {
     // again sending responses to event sinks from threads other than the main thread is discouraged by flutter but we must not block the main thread
-    CreateThread(NULL, 0, HandleGetDevices, NULL, 0, NULL);
+    std::thread get_devices_thread(HandleGetDevices);
+    get_devices_thread.detach();
     result->Success(flutter::EncodableValue(true));
    } else if (method_call.method_name().compare("initiateScan") == 0) {
+    auto scannerName = std::get_if<std::string>(&(args->find(flutter::EncodableValue("scannerName")))->second);
     // again sending responses to event sinks from threads other than the main thread is discouraged by flutter but we must not block the main thread
-    CreateThread(NULL, 0, HandleScan, &args, 0, NULL);
+    std::thread scan_thread(HandleScan, *scannerName);
+    scan_thread.detach();
     result->Success(flutter::EncodableValue(true));
    } else {
     result->NotImplemented();

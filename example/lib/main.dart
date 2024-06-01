@@ -80,7 +80,8 @@ class _MyAppState extends State<MyApp> {
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: () => _initiateScan(_scanners[index]),
-                    child: Text(_scanners[index].name),
+                    child: Text(
+                        "${_scanners[index].name} ${_scanners[index].model}"),
                   ),
                 ),
               ),

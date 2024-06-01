@@ -21,9 +21,9 @@ class FlutterDesktopScannerPlugin : public flutter::Plugin {
   FlutterDesktopScannerPlugin(const FlutterDesktopScannerPlugin&) = delete;
   FlutterDesktopScannerPlugin& operator=(const FlutterDesktopScannerPlugin&) = delete;
 
-  static DWORD WINAPI HandleGetDevices(LPVOID);
+  static void HandleGetDevices();
 
-  static DWORD WINAPI HandleScan(LPVOID);
+  static void HandleScan(std::string);
 
   // Called when a method is called on this plugin's channel from Dart.
   void HandleMethodCall(

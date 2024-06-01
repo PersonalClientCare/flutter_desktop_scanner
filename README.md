@@ -90,5 +90,5 @@ await _flutterDesktopScannerPlugin.initScan(scanner);
 `rawBytesStream`: This stream returns a `Uint8List` containing the raw image bytes.  
 The format is different on each platform:
 - For linux it's PNM.
-- For windows it's (most likely) JPEG.
+- For windows it's (most likely) on of BMP / TIFF.
 - For MacOS it's TODO.
