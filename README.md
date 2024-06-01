@@ -40,7 +40,7 @@ Because the scanning process for devices, as well as the literal scanning, takes
 Here's how to get devices:
 
 ```dart
-final _flutterDesktopScanenrPlugin = FlutterDesktopScannerPlugin();
+final _flutterDesktopScannerPlugin = FlutterDesktopScannerPlugin();
 
 ...
 
@@ -61,7 +61,7 @@ await _flutterDesktopScannerPlugin.initGetDevices();
 And here how you can initiate a scan:
 
 ```dart
-final _flutterDesktopScanenrPlugin = FlutterDesktopScannerPlugin();
+final _flutterDesktopScannerPlugin = FlutterDesktopScannerPlugin();
 
 ...
 
