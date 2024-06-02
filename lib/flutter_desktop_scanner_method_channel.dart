@@ -33,8 +33,7 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
   @override
   Future<bool> initGetDevices() async {
     final response = await methodChannel.invokeMethod<bool>("getScanners");
-    if (response == null) return false;
-    return response;
+    return response ?? false;
   }
 
   @override
@@ -57,8 +56,7 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
     }
     final response = await methodChannel
         .invokeMethod<bool>("initiateScan", {"scannerName": identifier});
-    if (response == null) return false;
-    return response;
+    return response ?? false;
   }
 
   @override

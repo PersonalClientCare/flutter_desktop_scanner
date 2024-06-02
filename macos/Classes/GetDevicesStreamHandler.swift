@@ -10,7 +10,7 @@ class ScannerManager: NSObject, ICDeviceBrowserDelegate, ICScannerDeviceDelegate
         super.init()
         deviceBrowser = ICDeviceBrowser()
         deviceBrowser?.delegate = self
-        deviceBrowser?.browsedDeviceTypeMask = ICDeviceTypeMask.scanner.rawValue
+        deviceBrowser?.browsedDeviceTypeMask = ICDeviceTypeMask.scanner
     }
     
     func startScanningForDevices() {
@@ -41,16 +41,40 @@ class ScannerManager: NSObject, ICDeviceBrowserDelegate, ICScannerDeviceDelegate
         return scannerDevices
     }
     
+    func device(_ device: ICDevice, didCloseSessionWithError error: Error?) {
+        if let error = error {
+            print("Device closed with error: \(error.localizedDescription)")
+        } else {
+            print("Device closed successfully")
+        }
+    }
+
+    func device(_ device: ICDevice, didOpenSessionWithError error: Error?) {
+        if let error = error {
+            print("Device opened with error: \(error.localizedDescription)")
+        } else {
+            print("Device opened successfully")
+        }
+    }
+    
+    func deviceDidBecomeReady(_ device: ICDevice) {
+        print("Device is ready: \(device.name ?? "Unknown")")
+    }
+    
+    // ICScannerDeviceDelegate methods
+    func scannerDeviceDidBecomeAvailable(_ scanner: ICScannerDevice) {
+        print("Scanner device did become available: \(scanner.name ?? "Unknown")")
+    }
+
+    func didRemove(_ device: ICDevice) {
+        print("Did remove for: \(device.name ?? "Unknown")")
+    }
+    
 }
 
 class GetDevicesStreamHandler: NSObject, FlutterStreamHandler {
-    var eventSink: FlutterEventSink?
-    var scannerManager: ScannerManager
-
-    override init() {
-        super.init()
-        scannerManager = ScannerManager()
-    }
+    private var eventSink: FlutterEventSink?
+    private let scannerManager: ScannerManager = ScannerManager()
 
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         eventSink = events
@@ -63,17 +87,20 @@ class GetDevicesStreamHandler: NSObject, FlutterStreamHandler {
     }
 
     func getDevices() {
+        print("Starting to get devices")
         let rawScanners = scannerManager.listScanners()
-        let scannerResult = []
+        print("got scanners")
+        var scannerResult = [[String: String?]]()
         for scanner in rawScanners {
-            scannerResult.append({
-                "name": scanner.name,
+            let result = ["name": scanner.name,
                 "model": scanner.persistentIDString,
                 "vendor": "macOS",
                 "type": scanner.productKind
-            })
+            ]
+            print("Got device \(result)")
+            scannerResult.append(result)
         }
-        eventSink?(scanners)
+        eventSink?(scannerResult)
         scannerManager.stopScanningForDevices()
     }
 }

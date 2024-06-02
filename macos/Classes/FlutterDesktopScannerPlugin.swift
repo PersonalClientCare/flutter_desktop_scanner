@@ -2,7 +2,7 @@ import Cocoa
 import FlutterMacOS
 
 public class FlutterDesktopScannerPlugin: NSObject, FlutterPlugin {
-  private let devicesHandler = GetDevicesStreamHandler()
+  private static let devicesHandler = GetDevicesStreamHandler()
 
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(name: "personalclientcare/flutter_desktop_scanner", binaryMessenger: registrar.messenger)
@@ -15,15 +15,15 @@ public class FlutterDesktopScannerPlugin: NSObject, FlutterPlugin {
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
-    case "getPlatformVersion":
-      result("macOS " + ProcessInfo.processInfo.operatingSystemVersionString)
-    case "getDevices":
-      DispatchQueue.global(qos: .userInitiated).async {
-        devicesHandler.getDevices()
-      }
-      result(true)
-    default:
-      result(FlutterMethodNotImplemented)
+      case "getPlatformVersion":
+        result("macOS " + ProcessInfo.processInfo.operatingSystemVersionString)
+      case "getScanners":
+        DispatchQueue.global(qos: .background).async {
+          FlutterDesktopScannerPlugin.devicesHandler.getDevices()
+        }
+        result(true)
+      default:
+        result(FlutterMethodNotImplemented)
     }
   }
 }
