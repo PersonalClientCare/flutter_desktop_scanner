@@ -4,14 +4,14 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'flutter_desktop_scanner'
-  s.version          = '0.0.1'
-  s.summary          = 'A new Flutter plugin project.'
+  s.version          = '1.0.0'
+  s.summary          = 'A desktop scanner plugin'
   s.description      = <<-DESC
-A new Flutter plugin project.
+  Making scanning with physical scanners on desktop a breeze!
                        DESC
-  s.homepage         = 'http://example.com'
+  s.homepage         = 'https://github.com/PersonalClientCare/flutter_desktop_scanner'
   s.license          = { :file => '../LICENSE' }
-  s.author           = { 'Your Company' => 'email@example.com' }
+  s.author           = { 'PersonalClientCare' => 'habereder.korbinian@personalclientcare.com' }
 
   s.source           = { :path => '.' }
   s.source_files     = 'Classes/**/*'
