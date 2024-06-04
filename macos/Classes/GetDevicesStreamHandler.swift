@@ -5,12 +5,19 @@ import FlutterMacOS
 class ScannerManager: NSObject, ICDeviceBrowserDelegate, ICScannerDeviceDelegate {
     private var deviceBrowser: ICDeviceBrowser?
     private var scannerDevices: [ICScannerDevice] = []
+
+    static let shared = ScannerManager() 
     
-    override init() {
+    private override init() {
         super.init()
         deviceBrowser = ICDeviceBrowser()
         deviceBrowser?.delegate = self
-        deviceBrowser?.browsedDeviceTypeMask = ICDeviceTypeMask.scanner
+        deviceBrowser?.browsedDeviceTypeMask = ICDeviceTypeMask(rawValue: ICDeviceTypeMask.scanner.rawValue |
+            ICDeviceLocationTypeMask.local.rawValue |
+            ICDeviceLocationTypeMask.shared.rawValue |
+            ICDeviceLocationTypeMask.bonjour.rawValue |
+            ICDeviceLocationTypeMask.bluetooth.rawValue |
+            ICDeviceLocationTypeMask.remote.rawValue)!
     }
     
     func startScanningForDevices() {
@@ -69,25 +76,36 @@ class ScannerManager: NSObject, ICDeviceBrowserDelegate, ICScannerDeviceDelegate
     func didRemove(_ device: ICDevice) {
         print("Did remove for: \(device.name ?? "Unknown")")
     }
+
+    func getScannerById(_ scannerId: String, completion: @escaping (ICScannerDevice?) -> Void) {
+        if let scanner = scannerDevices.first(where: { $0.uuidString == scannerId }) {
+            completion(scanner)
+        } else {
+            deviceReadyHandlers[scannerId] = { device in
+                completion(device as? ICScannerDevice)
+            }
+        }
+    }
     
 }
 
 class GetDevicesStreamHandler: NSObject, FlutterStreamHandler {
     private var eventSink: FlutterEventSink?
-    private let scannerManager: ScannerManager = ScannerManager()
+    private let scannerManager: ScannerManager = ScannerManager.shared
 
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        scannerManager.startScanningForDevices()
         eventSink = events
         return nil
     }
 
     func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        scannerManager.stopScanningForDevices()
         eventSink = nil
         return nil
     }
 
     func getDevices() {
-        print("Starting to get devices")
         let rawScanners = scannerManager.listScanners()
         print("got scanners")
         var scannerResult = [[String: String?]]()
@@ -101,6 +119,5 @@ class GetDevicesStreamHandler: NSObject, FlutterStreamHandler {
             scannerResult.append(result)
         }
         eventSink?(scannerResult)
-        scannerManager.stopScanningForDevices()
     }
 }

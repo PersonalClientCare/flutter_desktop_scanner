@@ -72,7 +72,7 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
     final stream = scanEventChannel.receiveBroadcastStream();
     await for (final bytes in stream) {
       if (bytes != null) {
-        if (Platform.isWindows) {
+        if (Platform.isWindows || Platform.isMacOS) {
           var decodedImg = img.decodePng(bytes);
           // try out some other formats before returning null eventually
           decodedImg ??= img.decodeBmp(bytes);
