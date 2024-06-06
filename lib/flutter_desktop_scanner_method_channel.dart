@@ -51,7 +51,7 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
   @override
   Future<bool> initScan(Scanner scanner) async {
     var identifier = scanner.name;
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isMacOS) {
       identifier = scanner.model;
     }
     final response = await methodChannel

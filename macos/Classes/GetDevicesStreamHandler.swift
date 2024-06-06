@@ -5,6 +5,7 @@ import FlutterMacOS
 class ScannerManager: NSObject, ICDeviceBrowserDelegate, ICScannerDeviceDelegate {
     private var deviceBrowser: ICDeviceBrowser?
     private var scannerDevices: [ICScannerDevice] = []
+    private var deviceReadyHandlers: [String: (ICDevice) -> Void] = [:]
 
     static let shared = ScannerManager() 
     
@@ -33,6 +34,12 @@ class ScannerManager: NSObject, ICDeviceBrowserDelegate, ICScannerDeviceDelegate
         if let scannerDevice = device as? ICScannerDevice {
             scannerDevices.append(scannerDevice)
             scannerDevice.delegate = self
+
+            // If there is a ready handler for this device, call it
+            if let handler = deviceReadyHandlers[scannerDevice.uuidString!] {
+                handler(scannerDevice)
+                deviceReadyHandlers.removeValue(forKey: scannerDevice.uuidString!)
+            }
         }
     }
     
@@ -106,18 +113,19 @@ class GetDevicesStreamHandler: NSObject, FlutterStreamHandler {
     }
 
     func getDevices() {
-        let rawScanners = scannerManager.listScanners()
-        print("got scanners")
-        var scannerResult = [[String: String?]]()
-        for scanner in rawScanners {
-            let result = ["name": scanner.name,
-                "model": scanner.persistentIDString,
-                "vendor": "macOS",
-                "type": scanner.productKind
-            ]
-            print("Got device \(result)")
-            scannerResult.append(result)
+        // add artificial delay to ensure devices are found
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            let rawScanners = self.scannerManager.listScanners()
+            var scannerResult = [[String: String?]]()
+            for scanner in rawScanners {
+                let result = ["name": scanner.name,
+                    "model": scanner.uuidString,
+                    "vendor": "macOS",
+                    "type": scanner.productKind
+                ]
+                scannerResult.append(result)
+            }
+            self.eventSink?(scannerResult)
         }
-        eventSink?(scannerResult)
     }
 }

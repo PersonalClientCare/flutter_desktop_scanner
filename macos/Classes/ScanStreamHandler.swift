@@ -4,42 +4,52 @@ import ImageCaptureCore
 import FlutterMacOS
 
 class ScannerHandler: NSObject, ICScannerDeviceDelegate {
-    private var eventSink: FlutterEventSink?
     private var scanner: ICScannerDevice?
+    private var scanCompletion: ((Data?) -> Void)?
     
-    init(scanner: ICScannerDevice, eventSink: FlutterEventSink) {
+    init(scanner: ICScannerDevice) {
         super.init()
         self.scanner = scanner
         self.scanner?.delegate = self
-        self.eventSink = eventSink
     }
     
-    func startScan() {
+    func startScan(completion: @escaping (Data?) -> Void) {
         guard let scanner = scanner else {
             print("No scanner selected")
             return
         }
         
-        guard let functionalUnit = scanner.selectedFunctionalUnit else {
-            print("No functional unit selected")
-            return
-        }
-        
+        // Access the functional unit and cast it to the correct type
+        let functionalUnit = scanner.selectedFunctionalUnit
+        // Store the completion handler
+        scanCompletion = completion
+            
         // Configure the functional unit as needed, e.g., set resolution, color mode, etc.
-        functionalUnit.scanInProgress = true
+        functionalUnit.resolution = 300
+
         scanner.requestScan()
     }
     
-    func scannerDevice(_ scanner: ICScannerDevice, didScanTo url: URL, data: Data?) -> [UInt8] {        
-        // Save the scanned data to a byte buffer
-        if let imageData = data {
-            eventSink?([UInt8](data))
+    func scannerDevice(_ scanner: ICScannerDevice, didScanTo url: URL) {        
+        // Read the scanned data from the URL
+        do {
+            let scannedData = try Data(contentsOf: url)
+            scanCompletion?(scannedData)
+        } catch {
+            print("Error reading scanned data: \(error)")
+            scanCompletion?(nil)
         }
+    }
+
+    func scannerDevice(_ scanner: ICScannerDevice, didScanToBandData data: Data) {
+        // Call the completion handler with the scanned data
+        scanCompletion?(data)
     }
     
     func scannerDevice(_ scanner: ICScannerDevice, didCompleteOverviewScanWithError error: Error?) {
         if let error = error {
             print("Overview scan completed with error: \(error.localizedDescription)")
+            scanCompletion?(nil)
         } else {
             print("Overview scan completed successfully")
         }
@@ -48,9 +58,14 @@ class ScannerHandler: NSObject, ICScannerDeviceDelegate {
     func scannerDevice(_ scanner: ICScannerDevice, didCompleteScanWithError error: Error?) {
         if let error = error {
             print("Scan completed with error: \(error.localizedDescription)")
+            scanCompletion?(nil)
         } else {
             print("Scan completed successfully")
         }
+    }
+    
+    func scannerDevice(_ scanner: ICScannerDevice, didReceive statusInformation: [String : Any]) {
+        print("Received status information: \(statusInformation)")
     }
     
     func device(_ device: ICDevice, didCloseSessionWithError error: Error?) {
@@ -68,13 +83,15 @@ class ScannerHandler: NSObject, ICScannerDeviceDelegate {
             print("Device opened successfully")
         }
     }
+
+    func device(_ device: ICDevice, didEncounterError error: Error?) {
+        if let error = error {
+            print("Device encountered error: \(error.localizedDescription)")
+        }
+    }
     
     func deviceDidBecomeReady(_ device: ICDevice) {
         print("Device is ready: \(device.name ?? "Unknown")")
-    }
-    
-    func scannerDevice(_ scanner: ICScannerDevice, didReceive statusInformation: [String : Any]) {
-        print("Received status information: \(statusInformation)")
     }
 
     func scannerDeviceDidBecomeAvailable(_ scanner: ICScannerDevice) {
@@ -101,8 +118,21 @@ class ScanStreamHandler: NSObject, FlutterStreamHandler {
     }
 
     func initScan(scannerId: String) {
-        let scanner = scannerManager.getScannerById(scannerId)
-        let scannerHandler = ScannerHandler(scanner, eventSink)
-        scannerHandler.startScan()
+        scannerManager.getScannerById(scannerId) { scanner in
+            if let scanner = scanner {
+                let scannerHandler = ScannerHandler(scanner: scanner)
+                scannerHandler.startScan { data in
+                    if let imageData = data {
+                        // Handle the scanned image data
+                        let byteBuffer = [UInt8](imageData)
+                        self.eventSink?(byteBuffer)
+                    } else {
+                        print("Failed to scan image")
+                    }
+                }
+            } else {
+                print("Scanner with ID \(scannerId) not found")
+            }
+        }
     }
 }

@@ -25,9 +25,11 @@ public class FlutterDesktopScannerPlugin: NSObject, FlutterPlugin {
           FlutterDesktopScannerPlugin.devicesHandler.getDevices()
         }
         result(true)
-      case "initScan":
+      case "initiateScan":
+        let args = call.arguments as? Dictionary<String, Any>
+        let scannerId = args!["scannerName"] as? String
         DispatchQueue.global(qos: .background).async {
-          FlutterDesktopScannerPlugin.scanHandler.initScan()
+          FlutterDesktopScannerPlugin.scanHandler.initScan(scannerId: scannerId!)
         }
         result(true)
       default:
