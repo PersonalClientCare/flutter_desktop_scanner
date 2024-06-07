@@ -72,16 +72,19 @@ class MethodChannelFlutterDesktopScanner extends FlutterDesktopScannerPlatform {
     final stream = scanEventChannel.receiveBroadcastStream();
     await for (final bytes in stream) {
       if (bytes != null) {
+        // this should only occur on mac
+        var convertedBytes = bytes is! Uint8List ? Uint8List.fromList(List<int>.from(bytes)) : bytes;
         if (Platform.isWindows || Platform.isMacOS) {
-          var decodedImg = img.decodePng(bytes);
+          var decodedImg = img.decodePng(convertedBytes);
           // try out some other formats before returning null eventually
-          decodedImg ??= img.decodeBmp(bytes);
-          decodedImg ??= img.decodeTiff(bytes);
+          decodedImg ??= img.decodeBmp(convertedBytes);
+          decodedImg ??= img.decodeTiff(convertedBytes);
           try {
             // throws an ImageException if data is really not a JPG; see https://github.com/brendan-duncan/image/issues/101
-            decodedImg ??= img.decodeJpg(bytes);
+            decodedImg ??= img.decodeJpg(convertedBytes);
           } on img.ImageException {
-            yield null;
+            decodedImg ??= img.decodeImage(convertedBytes); // last hope
+            yield decodedImg;
           }
           yield decodedImg;
         } else if (Platform.isLinux) {

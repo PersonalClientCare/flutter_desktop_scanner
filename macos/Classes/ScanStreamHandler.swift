@@ -2,63 +2,101 @@ import Cocoa
 import Foundation
 import ImageCaptureCore
 import FlutterMacOS
+import CoreGraphics
+
+extension CGImage {
+    /**
+      Converts the image into an array of RGBA bytes.
+    */
+    @nonobjc public func toByteArrayRGBA() -> [UInt8] {
+        var bytes = [UInt8](repeating: 0, count: width * height * 4)
+        bytes.withUnsafeMutableBytes { ptr in
+          if let colorSpace = colorSpace,
+             let context = CGContext(
+                        data: ptr.baseAddress,
+                        width: width,
+                        height: height,
+                        bitsPerComponent: bitsPerComponent,
+                        bytesPerRow: bytesPerRow,
+                        space: colorSpace,
+                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
+            let rect = CGRect(x: 0, y: 0, width: width, height: height)
+            context.draw(self, in: rect)
+          }
+        }
+        return bytes
+      }
+}
 
 class ScannerHandler: NSObject, ICScannerDeviceDelegate {
+    private var eventSink: FlutterEventSink?
     private var scanner: ICScannerDevice?
-    private var scanCompletion: ((Data?) -> Void)?
     
-    init(scanner: ICScannerDevice) {
+    init(scanner: ICScannerDevice, eventSink: FlutterEventSink?) {
         super.init()
         self.scanner = scanner
         self.scanner?.delegate = self
+        self.eventSink = eventSink
     }
     
-    func startScan(completion: @escaping (Data?) -> Void) {
-        guard let scanner = scanner else {
-            print("No scanner selected")
-            return
-        }
+    func startScan() {
+        // Access the functional unit
+        let functionalUnit = scanner!.selectedFunctionalUnit
         
-        // Access the functional unit and cast it to the correct type
-        let functionalUnit = scanner.selectedFunctionalUnit
-        // Store the completion handler
-        scanCompletion = completion
-            
         // Configure the functional unit as needed, e.g., set resolution, color mode, etc.
         functionalUnit.resolution = 300
-
-        scanner.requestScan()
+        functionalUnit.bitDepth = ICScannerBitDepth.depth8Bits
+        
+        scanner?.requestOpenSession()
     }
     
     func scannerDevice(_ scanner: ICScannerDevice, didScanTo url: URL) {        
         // Read the scanned data from the URL
         do {
             let scannedData = try Data(contentsOf: url)
-            scanCompletion?(scannedData)
+            eventSink?([UInt8](scannedData))
         } catch {
             print("Error reading scanned data: \(error)")
-            scanCompletion?(nil)
+            eventSink?(nil)
         }
     }
+    
+    func scannerDevice(_ scanner: ICScannerDevice, didScanTo data: ICScannerBandData) {
+        print("Got memory based data \(data.dataBuffer!)")
+        eventSink?([UInt8](data.dataBuffer!))
+    }
 
-    func scannerDevice(_ scanner: ICScannerDevice, didScanToBandData data: Data) {
-        // Call the completion handler with the scanned data
-        scanCompletion?(data)
+    @discardableResult func writeCGImage(_ image: CGImage, to destinationURL: URL) -> Bool {
+        guard let destination = CGImageDestinationCreateWithURL(destinationURL as CFURL, kUTTypePNG, 1, nil) else { return false }
+        CGImageDestinationAddImage(destination, image, nil)
+        return CGImageDestinationFinalize(destination)
     }
     
     func scannerDevice(_ scanner: ICScannerDevice, didCompleteOverviewScanWithError error: Error?) {
         if let error = error {
             print("Overview scan completed with error: \(error.localizedDescription)")
-            scanCompletion?(nil)
+            eventSink?(nil)
         } else {
             print("Overview scan completed successfully")
+            let funcUnit = scanner.selectedFunctionalUnit
+            guard let image = funcUnit.overviewImage else {
+                print("Overview image is not available.")
+                return
+            }
+
+            writeCGImage(image, to: URL(string: "test.png")!)
+
+            let byteArray = image.toByteArrayRGBA()
+            eventSink?(byteArray)
+            
+            scanner.requestCloseSession()
         }
     }
     
     func scannerDevice(_ scanner: ICScannerDevice, didCompleteScanWithError error: Error?) {
         if let error = error {
             print("Scan completed with error: \(error.localizedDescription)")
-            scanCompletion?(nil)
+            eventSink?(nil)
         } else {
             print("Scan completed successfully")
         }
@@ -92,10 +130,14 @@ class ScannerHandler: NSObject, ICScannerDeviceDelegate {
     
     func deviceDidBecomeReady(_ device: ICDevice) {
         print("Device is ready: \(device.name ?? "Unknown")")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.scanner?.requestOverviewScan()
+        }
     }
 
     func scannerDeviceDidBecomeAvailable(_ scanner: ICScannerDevice) {
         print("Scanner device did become available: \(scanner.name ?? "Unknown")")
+        
     }
 
     func didRemove(_ device: ICDevice) {
@@ -106,6 +148,7 @@ class ScannerHandler: NSObject, ICScannerDeviceDelegate {
 class ScanStreamHandler: NSObject, FlutterStreamHandler {
     private var eventSink: FlutterEventSink?
     private let scannerManager: ScannerManager = ScannerManager.shared
+    private var scannerHandler: ScannerHandler?
 
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         eventSink = events
@@ -118,20 +161,15 @@ class ScanStreamHandler: NSObject, FlutterStreamHandler {
     }
 
     func initScan(scannerId: String) {
-        scannerManager.getScannerById(scannerId) { scanner in
-            if let scanner = scanner {
-                let scannerHandler = ScannerHandler(scanner: scanner)
-                scannerHandler.startScan { data in
-                    if let imageData = data {
-                        // Handle the scanned image data
-                        let byteBuffer = [UInt8](imageData)
-                        self.eventSink?(byteBuffer)
-                    } else {
-                        print("Failed to scan image")
-                    }
+        // add artificial delay to ensure onListen was called and eventSink != nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+            self.scannerManager.getScannerById(scannerId) { scanner in
+                if let scanner = scanner {
+                    self.scannerHandler = ScannerHandler(scanner: scanner, eventSink: self.eventSink)
+                    self.scannerHandler!.startScan()
+                } else {
+                    print("Scanner with ID \(scannerId) not found")
                 }
-            } else {
-                print("Scanner with ID \(scannerId) not found")
             }
         }
     }
