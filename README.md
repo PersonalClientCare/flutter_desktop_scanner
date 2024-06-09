@@ -1,4 +1,4 @@
-<img src="assets/desktop_scanner_logo.png" width="150" alt="flutter desktop scanner logo" />  
+<img src="https://raw.githubusercontent.com/PersonalClientCare/flutter_desktop_scanner/main/assets/desktop_scanner_logo.png" width="150" alt="flutter desktop scanner logo" />  
 
 # flutter_desktop_scanner
 
