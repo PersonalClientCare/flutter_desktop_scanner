@@ -6,7 +6,7 @@ Making scanning with physical scanners on desktop a breeze!
 
 ## Getting Started
 
-Because this plugin depends on some system libraries (SANE, WIA, TWAIN) you have to set up them up for linking in your flutter project.  
+Because this plugin depends on some system libraries (SANE, WIA) you have to set up them up for linking in your flutter project.  
 
 ### Linux
 
@@ -33,6 +33,8 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LINKER_FLAGS}")
 Nothing to do here! WIA is generally available as a header file.
 
 ### MacOS
+
+Nothing to do here! MacOS uses the ImagCaptureCore framework which should be available since 10.14.
 
 ## Using the plugin
 Because the scanning process for devices, as well as the literal scanning, takes some time the plugin is based on `EventChannels`. `EventChannels` are like `MethodChannels` but for streams, which allow for getting data from native platforms via a stream. Because of that you always have to get a stream reference before initiating an action.
@@ -91,4 +93,4 @@ await _flutterDesktopScannerPlugin.initScan(scanner);
 The format is different on each platform:
 - For linux it's PNM.
 - For windows it's (most likely) one of BMP / TIFF.
-- For MacOS it's TODO.
+- For MacOS it's PNG.
