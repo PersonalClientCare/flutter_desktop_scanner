@@ -6,26 +6,15 @@ import CoreGraphics
 
 extension CGImage {
     /**
-      Converts the image into an array of RGBA bytes.
-    */
-    @nonobjc public func toByteArrayRGBA() -> [UInt8] {
-        var bytes = [UInt8](repeating: 0, count: width * height * 4)
-        bytes.withUnsafeMutableBytes { ptr in
-          if let colorSpace = colorSpace,
-             let context = CGContext(
-                        data: ptr.baseAddress,
-                        width: width,
-                        height: height,
-                        bitsPerComponent: bitsPerComponent,
-                        bytesPerRow: bytesPerRow,
-                        space: colorSpace,
-                        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) {
-            let rect = CGRect(x: 0, y: 0, width: width, height: height)
-            context.draw(self, in: rect)
-          }
-        }
-        return bytes
-      }
+            Converts the given CGImage int a PNG Data? object
+     */
+    var png: Data? {
+        guard let mutableData = CFDataCreateMutable(nil, 0),
+              let destination = CGImageDestinationCreateWithData(mutableData, "public.png" as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(destination, self, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        return mutableData as Data
+    }
 }
 
 class ScannerHandler: NSObject, ICScannerDeviceDelegate {
@@ -65,12 +54,6 @@ class ScannerHandler: NSObject, ICScannerDeviceDelegate {
         print("Got memory based data \(data.dataBuffer!)")
         eventSink?([UInt8](data.dataBuffer!))
     }
-
-    @discardableResult func writeCGImage(_ image: CGImage, to destinationURL: URL) -> Bool {
-        guard let destination = CGImageDestinationCreateWithURL(destinationURL as CFURL, kUTTypePNG, 1, nil) else { return false }
-        CGImageDestinationAddImage(destination, image, nil)
-        return CGImageDestinationFinalize(destination)
-    }
     
     func scannerDevice(_ scanner: ICScannerDevice, didCompleteOverviewScanWithError error: Error?) {
         if let error = error {
@@ -83,11 +66,8 @@ class ScannerHandler: NSObject, ICScannerDeviceDelegate {
                 print("Overview image is not available.")
                 return
             }
-
-            writeCGImage(image, to: URL(string: "test.png")!)
-
-            let byteArray = image.toByteArrayRGBA()
-            eventSink?(byteArray)
+            
+            eventSink?([UInt8](image.png!))
             
             scanner.requestCloseSession()
         }
