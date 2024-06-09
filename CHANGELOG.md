@@ -1,3 +1,5 @@
-## 0.0.1
+## 1.0.0 - 09.06.2024
 
-* TODO: Describe initial release.
+**INITIAL RELEASE 🎉**  
+
+* Support for Linux, Windows and macOS physical scanner
