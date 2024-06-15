@@ -15,31 +15,26 @@ class MockFlutterDesktopScannerPlatform
 
   @override
   Stream<List<Scanner>> getDevicesStream() {
-    // TODO: implement getDevicesStream
     throw UnimplementedError();
   }
 
   @override
   Stream<Image?> imageReprStream() {
-    // TODO: implement imageReprStream
     throw UnimplementedError();
   }
 
   @override
   Future<bool> initGetDevices() {
-    // TODO: implement initGetDevices
     throw UnimplementedError();
   }
 
   @override
   Future<bool> initScan(Scanner scanner) {
-    // TODO: implement initScan
     throw UnimplementedError();
   }
 
   @override
   Stream<Uint8List> rawBytesStream() {
-    // TODO: implement rawPNMStream
     throw UnimplementedError();
   }
 }

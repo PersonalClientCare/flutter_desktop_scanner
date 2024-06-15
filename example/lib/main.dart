@@ -23,7 +23,7 @@ class _MyAppState extends State<MyApp> {
   List<Scanner> _scanners = [];
   bool _loading = false;
   bool _imgLoading = false;
-  Uint8List? _imgBytes = null;
+  Uint8List? _imgBytes;
 
   @override
   void initState() {
